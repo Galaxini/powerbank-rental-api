@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Enums;
+namespace App\Domain\Rental\Enums;
 
 /**
  * Defines the status values for a rental transaction.
