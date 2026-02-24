@@ -1,59 +1,138 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Powerbank Rental API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Backend API for power bank rental flow built with Laravel 12, PHP 8.3, PostgreSQL, Redis and Docker.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Auth with Laravel Sanctum personal access tokens
+- Start rental with business validations and transactional updates
+- Return rental with overdue calculation and penalty (`penalty_cents`)
+- Domain enums for rental and power bank statuses
+- Conflict handling with JSON `409 CONFLICT` responses for business conflicts
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Tech Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.3
+- Laravel 12
+- PostgreSQL 15
+- Redis 7
+- Docker Compose
 
-## Learning Laravel
+## Quick Start (Docker)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+1. Copy env:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+cp .env.example .env
+```
 
-## Laravel Sponsors
+2. Build and start services:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+docker compose up -d --build
+```
 
-### Premium Partners
+3. Install dependencies:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+docker compose exec app composer install
+```
 
-## Contributing
+4. Run migrations:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+docker compose exec app php artisan migrate
+```
 
-## Code of Conduct
+5. (Optional) Start Laravel dev server inside container:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+docker compose exec app php artisan serve --host=0.0.0.0 --port=8000
+```
 
-## Security Vulnerabilities
+API base URL:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```text
+http://localhost:8000/api
+```
 
-## License
+## API Endpoints
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### Auth
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout` (Bearer token)
+
+### Rentals
+
+- `POST /api/v1/rentals/start` (Bearer token)
+- `POST /api/v1/rentals/{rental}/return` (Bearer token)
+
+## cURL Examples
+
+Register:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+Login:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+Start rental:
+
+```bash
+TOKEN="<TOKEN>"
+curl -X POST http://localhost:8000/api/v1/rentals/start \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"pickup_point_id":1,"power_bank_id":1}'
+```
+
+Return rental:
+
+```bash
+TOKEN="<TOKEN>"
+RENTAL_ID=1
+curl -X POST http://localhost:8000/api/v1/rentals/${RENTAL_ID}/return \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: application/json"
+```
+
+## Architecture
+
+The project follows a pragmatic layered + DDD-oriented structure:
+
+- `app/Http/*`: transport layer (controllers, requests)
+- `app/DTO/*`: input contracts between controller and service
+- `app/Services/*`: application services (use-cases orchestration)
+- `app/Domain/*`: domain objects and business concepts
+- `app/Domain/PowerBank/Enums/*`: power bank domain statuses
+- `app/Domain/Rental/Enums/*`: rental domain statuses
+- `app/Domain/Rental/Services/*`: domain services (`ReturnRentalService`)
+- `app/Domain/Rental/Exceptions/*`: domain exceptions (`ConflictException`)
+- `app/Models/*`: persistence (Eloquent models)
+
+### Key business rules
+
+- A power bank can be rented only when `AVAILABLE`
+- A user cannot start a new rental if they already have `ACTIVE` or `OVERDUE`
+- Rental start and return operations run inside DB transactions
+- Return flow calculates overdue and saves `penalty_cents`
+- Business conflicts are returned as HTTP `409` with structured JSON
+
+## Notes for Recruiter Review
+
+- `.env` is not committed (`.gitignore`)
+- Use `.env.example` as the configuration template
+- Run migrations before testing endpoints
+- No frontend is included; this repository is API-only
